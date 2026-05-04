@@ -23,6 +23,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem!
 
+    /// App destino del paste, capturada al iniciar grabación.
+    /// Necesaria porque al hacer click en el pill, aunque el panel sea nonactivating,
+    /// la app destino puede perder foco efectivo y Cmd+V no llegaría al editor.
+    private var pasteTargetApp: NSRunningApplication?
+
     // MARK: - Animación de grabación
 
     private var animTimer: Timer?
@@ -38,6 +43,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Callback para actualizar menú cuando la ventana flotante cambia de estado
         FloatingTranscriptionWindowController.shared.onWindowStateChanged = { [weak self] in
             DispatchQueue.main.async { self?.rebuildMenu() }
+        }
+
+        // Pill flotante de micrófono (toggle de grabación)
+        PillWindowController.shared.onPillTapped = { [weak self] in
+            DispatchQueue.main.async { self?.handlePillTap() }
+        }
+        PillWindowController.shared.onPillHiddenByUser = { [weak self] in
+            DispatchQueue.main.async { self?.rebuildMenu() }
+        }
+        if config.floatingPillEnabled {
+            PillWindowController.shared.showPill()
         }
 
         // Transcripción: ⌘⌥
@@ -69,12 +85,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if !config.isValid {
             notify("⚠️ Configuración incompleta — abre el menú para ver el estado")
         }
+
+        // Verifica permiso de Accesibilidad. Sin él: no funciona el hotkey global
+        // ni el paste vía Cmd+V (ambos requieren posteo de eventos / event tap).
+        // Tras cada rebuild ad-hoc el cdhash cambia y macOS puede revocar este permiso.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.checkAccessibilityPermission()
+        }
+    }
+
+    private func checkAccessibilityPermission() {
+        let trusted = AXIsProcessTrusted()
+        if !trusted {
+            notify("⚠️ WhisperBar necesita Accesibilidad — Ajustes → Privacidad → Accesibilidad")
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         hotkey.tearDown()
         stopRecordingAnimation()
         FloatingTranscriptionWindowController.shared.hideWindow()
+        PillWindowController.shared.hidePill()
     }
 
     // MARK: - Barra de menú
@@ -121,6 +152,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let floatingHint = NSMenuItem(title: "⌘⌥⌃ para toggle rápido", action: nil, keyEquivalent: "")
         floatingHint.isEnabled = false
         menu.addItem(floatingHint)
+
+        menu.addItem(.separator())
+
+        // Pill flotante de micrófono
+        let pillTitle = config.floatingPillEnabled
+            ? "✓ Pill flotante visible"
+            : "🎤 Mostrar pill flotante"
+        let pillItem = NSMenuItem(title: pillTitle, action: #selector(togglePillAction), keyEquivalent: "p")
+        pillItem.keyEquivalentModifierMask = [.command, .option]
+        menu.addItem(pillItem)
+
+        let pillHint = NSMenuItem(title: "Click en el pill para grabar/transcribir", action: nil, keyEquivalent: "")
+        pillHint.isEnabled = false
+        menu.addItem(pillHint)
 
         menu.addItem(.separator())
 
@@ -231,12 +276,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Grabación
 
     private func startRecording() {
+        // Capturar la app destino del paste antes de que cualquier UI nuestra robe foco.
+        // Para el shortcut esto es la app del usuario; para el pill la captura ocurre
+        // antes en handlePillTap (más fiable) y aquí solo se usa si no se capturó ya.
+        if pasteTargetApp == nil {
+            pasteTargetApp = currentPasteTarget()
+        }
         do {
             try recorder.start()
             startRecordingAnimation()
+            PillWindowController.shared.setState(.recording)
         } catch {
             notify("Error al iniciar grabación: \(error.localizedDescription)")
+            PillWindowController.shared.setState(.idle)
+            pasteTargetApp = nil
         }
+    }
+
+    /// App frontmost actual, ignorando WhisperBar mismo (por si el pill robara foco).
+    private func currentPasteTarget() -> NSRunningApplication? {
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        if frontmost?.processIdentifier == getpid() { return nil }
+        return frontmost
+    }
+
+    /// Restaura UI a estado idle (icono menubar + pill) y limpia destino del paste.
+    private func resetIdleUI() {
+        setIconEmoji("🎙")
+        PillWindowController.shared.setState(.idle)
+        pasteTargetApp = nil
     }
 
     private func stopAndTranscribe() {
@@ -246,11 +314,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let duration = recorder.stop()
 
         guard duration >= config.minRecordingDuration else {
-            setIconEmoji("🎙")
+            resetIdleUI()
             return
         }
 
         setIconEmoji("⏳")
+        PillWindowController.shared.setState(.transcribing)
         audioFeedback.start()
 
         let audioURL = recorder.outputURL
@@ -287,7 +356,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         let result = self.actionExecutor.execute(intent)
                         self.notify(result)
                         DispatchQueue.main.async {
-                            self.setIconEmoji("🎙")
+                            self.resetIdleUI()
                             self.rebuildMenu()
                         }
                     }
@@ -301,10 +370,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             case .failure(let error):
                 DispatchQueue.main.async { self.audioFeedback.stop() }
                 self.notify("Error: \(error.localizedDescription)")
-                self.setIconEmoji("🎙")
+                self.resetIdleUI()
             default:
                 DispatchQueue.main.async { self.audioFeedback.stop() }
-                self.setIconEmoji("🎙")
+                self.resetIdleUI()
             }
         }
     }
@@ -318,11 +387,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let duration = recorder.stop()
 
         guard duration >= config.minRecordingDuration else {
-            setIconEmoji("🎙")
+            resetIdleUI()
             return
         }
 
         setIconEmoji("🌐")
+        PillWindowController.shared.setState(.transcribing)
         audioFeedback.start()
 
         let audioURL = recorder.outputURL
@@ -339,10 +409,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             case .failure(let error):
                 DispatchQueue.main.async { self.audioFeedback.stop() }
                 self.notify("Traducción error: \(error.localizedDescription)")
-                self.setIconEmoji("🎙")
+                self.resetIdleUI()
             default:
                 DispatchQueue.main.async { self.audioFeedback.stop() }
-                self.setIconEmoji("🎙")
+                self.resetIdleUI()
             }
         }
     }
@@ -358,6 +428,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleFloatingAction() {
         toggleFloatingTranscription()
+    }
+
+    // MARK: - Pill flotante
+
+    /// Acción del menú: alterna visibilidad del pill flotante.
+    @objc private func togglePillAction() {
+        let wasEnabled = config.floatingPillEnabled
+        if wasEnabled, recorder.isRecording {
+            // Si el usuario apaga el pill mientras graba, terminamos la grabación
+            // limpiamente para que no quede audio huérfano.
+            stopAndTranscribe()
+        }
+        config.floatingPillEnabled = !wasEnabled
+        if config.floatingPillEnabled {
+            PillWindowController.shared.showPill()
+        } else {
+            PillWindowController.shared.hidePill()
+        }
+        rebuildMenu()
+    }
+
+    /// Click en el pill: dispatcher único entre iniciar y detener grabación.
+    private func handlePillTap() {
+        if recorder.isRecording {
+            stopAndTranscribe()
+        } else {
+            // Capturamos aquí (antes de que el click haya tenido tiempo de afectar el foco)
+            // para asegurar que el paste posterior llegue al editor del usuario.
+            pasteTargetApp = currentPasteTarget()
+            recordingMode = .transcribe
+            startRecording()
+        }
     }
 
     // MARK: - Paste (preserva el clipboard del usuario)
@@ -381,7 +483,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(previous, forType: .string)
             }
-            self?.setIconEmoji("🎙")
+            self?.resetIdleUI()
             self?.rebuildMenu()
         }
     }

@@ -30,6 +30,8 @@ swiftc \
     "$DIR/Sources/FloatingTranscriptionViewModel.swift" \
     "$DIR/Sources/FloatingTranscriptionView.swift" \
     "$DIR/Sources/FloatingTranscriptionWindowController.swift" \
+    "$DIR/Sources/PillView.swift" \
+    "$DIR/Sources/PillWindowController.swift" \
     "$DIR/Sources/PreferencesView.swift" \
     "$DIR/Sources/PreferencesWindowController.swift" \
     "$DIR/Sources/TranscriptionHistory.swift" \
