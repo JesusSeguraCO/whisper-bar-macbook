@@ -23,10 +23,11 @@ final class PillWindowController: NSObject, NSWindowDelegate {
     private let viewModel = PillViewModel()
     private let config = Config.shared
 
-    /// Tamaño del pill. Capsule alargado para visibilidad y dar espacio a la
-    /// animación de waveform durante grabación. Ancho mayor para textos como
-    /// "Procesando" + dots loader.
-    private let pillSize = CGSize(width: 200, height: 56)
+    /// Tamaño del NSPanel que hospeda el pill. El capsule visible es ~180×44 pero
+    /// el panel necesita un margen extra para que el glow (shadow) no se recorte
+    /// en las esquinas rectangulares del panel. La PillView centra el capsule
+    /// dentro del frame disponible.
+    private let pillSize = CGSize(width: 260, height: 120)
 
     /// Callback disparado cuando el usuario hace click izquierdo en el pill.
     var onPillTapped: (() -> Void)?
@@ -79,7 +80,9 @@ final class PillWindowController: NSObject, NSWindowDelegate {
         p.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         p.isOpaque = false
         p.backgroundColor = .clear
-        p.hasShadow = true
+        // hasShadow = false: el NSPanel rectangular dibujaría una sombra cuadrada
+        // que asoma por las esquinas del Capsule. El glow lo gestiona PillView.
+        p.hasShadow = false
         p.isMovableByWindowBackground = true
         p.hidesOnDeactivate = false
         p.ignoresMouseEvents = false

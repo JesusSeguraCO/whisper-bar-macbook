@@ -35,27 +35,38 @@ struct PillView: View {
     private let height: CGFloat = 44
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { ctx in
-            let t = ctx.date.timeIntervalSinceReferenceDate
-            content(time: t)
-                .padding(.horizontal, 14)
-                .frame(height: height)
-                .frame(minWidth: 150)
-                .background(background(time: t))
-                .overlay(border(time: t))
-                .clipShape(Capsule())
-                .shadow(color: glowColor.opacity(glowOpacity(time: t)),
-                        radius: glowRadius(time: t), x: 0, y: 0)
-                .scaleEffect(isHovering ? 1.05 : 1.0)
-                .animation(.spring(response: 0.28, dampingFraction: 0.7), value: isHovering)
+        // Color.clear fill expande para ocupar el NSPanel; el capsule queda
+        // centrado con margen suficiente para que el glow no se recorte en las
+        // esquinas rectangulares del panel.
+        ZStack {
+            Color.clear
+                .allowsHitTesting(false)
+
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { ctx in
+                let t = ctx.date.timeIntervalSinceReferenceDate
+                content(time: t)
+                    .padding(.horizontal, 14)
+                    .frame(height: height)
+                    .frame(minWidth: 150)
+                    .background(background(time: t))
+                    .overlay(border(time: t))
+                    .clipShape(Capsule())
+                    .shadow(color: glowColor.opacity(glowOpacity(time: t)),
+                            radius: glowRadius(time: t), x: 0, y: 0)
+                    .scaleEffect(isHovering ? 1.05 : 1.0)
+                    .animation(.spring(response: 0.28, dampingFraction: 0.7), value: isHovering)
+            }
+            .fixedSize()
+            .contentShape(Capsule())
+            .onTapGesture { onTap() }
+            .onHover { hovering in
+                isHovering = hovering
+                if hovering { NSCursor.pointingHand.push() }
+                else { NSCursor.pop() }
+            }
         }
-        .contentShape(Capsule())
-        .onTapGesture { onTap() }
-        .onHover { hovering in
-            isHovering = hovering
-            if hovering { NSCursor.pointingHand.push() }
-            else { NSCursor.pop() }
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityAddTraits(.isButton)
         .help(helpText)
