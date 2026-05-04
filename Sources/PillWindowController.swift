@@ -23,8 +23,10 @@ final class PillWindowController: NSObject, NSWindowDelegate {
     private let viewModel = PillViewModel()
     private let config = Config.shared
 
-    /// Tamaño del pill (debe coincidir con PillView.size).
-    private let pillSize = CGSize(width: 56, height: 56)
+    /// Tamaño del pill. Capsule alargado para visibilidad y dar espacio a la
+    /// animación de waveform durante grabación. Ancho mayor para textos como
+    /// "Procesando" + dots loader.
+    private let pillSize = CGSize(width: 200, height: 56)
 
     /// Callback disparado cuando el usuario hace click izquierdo en el pill.
     var onPillTapped: (() -> Void)?
