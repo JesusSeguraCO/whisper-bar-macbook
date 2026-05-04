@@ -759,6 +759,125 @@ func testConfigAutoDetection() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// MARK: - 19. PillViewModel — State transitions
+// ══════════════════════════════════════════════════════════════════════════════
+
+func testPillStateTransitions() {
+    suite("PillViewModel — State transitions")
+
+    let vm = PillViewModel()
+
+    // Estado inicial
+    if case .idle = vm.state {
+        assert(true, "PillViewModel inicia en .idle")
+    } else {
+        assert(false, "PillViewModel debería iniciar en .idle")
+    }
+
+    // idle → recording
+    vm.state = .recording
+    if case .recording = vm.state {
+        assert(true, "Transición idle → recording")
+    } else {
+        assert(false, "Estado no cambió a .recording")
+    }
+
+    // recording → transcribing
+    vm.state = .transcribing
+    if case .transcribing = vm.state {
+        assert(true, "Transición recording → transcribing")
+    } else {
+        assert(false, "Estado no cambió a .transcribing")
+    }
+
+    // transcribing → idle
+    vm.state = .idle
+    if case .idle = vm.state {
+        assert(true, "Transición transcribing → idle")
+    } else {
+        assert(false, "Estado no volvió a .idle")
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MARK: - 20. PillWindowController — Visibility & callbacks
+// ══════════════════════════════════════════════════════════════════════════════
+
+func testPillWindowControllerVisibility() {
+    suite("PillWindowController — Visibility & callbacks")
+
+    let wc = PillWindowController.shared
+
+    // Callbacks settables
+    var tapCalled = false
+    var hiddenCalled = false
+    wc.onPillTapped = { tapCalled = true }
+    wc.onPillHiddenByUser = { hiddenCalled = true }
+    assert(wc.onPillTapped != nil, "onPillTapped callback se puede asignar")
+    assert(wc.onPillHiddenByUser != nil, "onPillHiddenByUser callback se puede asignar")
+
+    // setState no crashea aún sin panel visible
+    wc.setState(.recording)
+    wc.setState(.transcribing)
+    wc.setState(.idle)
+    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+    assert(true, "setState es seguro de llamar antes de showPill")
+
+    // Cleanup
+    wc.onPillTapped = nil
+    wc.onPillHiddenByUser = nil
+    _ = tapCalled    // suprimir warning
+    _ = hiddenCalled
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MARK: - 21. Config — Floating pill defaults
+// ══════════════════════════════════════════════════════════════════════════════
+
+func testConfigFloatingPillDefaults() {
+    suite("Config — Floating pill defaults")
+
+    let config = Config.shared
+    let defaults = UserDefaults.standard
+
+    // Snapshot del estado actual para restaurarlo después
+    let savedEnabled = defaults.object(forKey: "floatingPillEnabled")
+    let savedX = defaults.object(forKey: "floatingPillOriginX")
+    let savedY = defaults.object(forKey: "floatingPillOriginY")
+
+    // Limpiar para verificar defaults
+    defaults.removeObject(forKey: "floatingPillEnabled")
+    defaults.removeObject(forKey: "floatingPillOriginX")
+    defaults.removeObject(forKey: "floatingPillOriginY")
+
+    assertEqual(config.floatingPillEnabled, true,
+        "floatingPillEnabled default = true (encendido por defecto)")
+    assert(config.floatingPillOriginX.isNaN,
+        "floatingPillOriginX default = .nan (sin valor previo)")
+    assert(config.floatingPillOriginY.isNaN,
+        "floatingPillOriginY default = .nan (sin valor previo)")
+
+    // Round-trip: setear y leer
+    config.floatingPillEnabled = false
+    assertEqual(config.floatingPillEnabled, false,
+        "floatingPillEnabled persiste setter false")
+    config.floatingPillOriginX = 123.5
+    config.floatingPillOriginY = 456.5
+    assertEqual(config.floatingPillOriginX, 123.5,
+        "floatingPillOriginX persiste valor numérico")
+    assertEqual(config.floatingPillOriginY, 456.5,
+        "floatingPillOriginY persiste valor numérico")
+
+    // Restaurar estado original
+    if let v = savedEnabled { defaults.set(v, forKey: "floatingPillEnabled") }
+    else { defaults.removeObject(forKey: "floatingPillEnabled") }
+    if let v = savedX { defaults.set(v, forKey: "floatingPillOriginX") }
+    else { defaults.removeObject(forKey: "floatingPillOriginX") }
+    if let v = savedY { defaults.set(v, forKey: "floatingPillOriginY") }
+    else { defaults.removeObject(forKey: "floatingPillOriginY") }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // MARK: - RUNNER
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -790,6 +909,9 @@ struct TestRunner {
         testEndToEndHallucinationFiltering()
         testWindowControllerState()
         testConfigAutoDetection()
+        testPillStateTransitions()
+        testPillWindowControllerVisibility()
+        testConfigFloatingPillDefaults()
 
         // Summary
         print("\n\u{001B}[1;35m══════════════════════════════════════════════════════════════\u{001B}[0m")

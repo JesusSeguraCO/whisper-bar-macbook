@@ -3,6 +3,7 @@ import SwiftUI
 struct HistoryView: View {
     @State private var entries: [TranscriptionEntry] = TranscriptionHistory.shared.allEntries
     @State private var searchText: String = ""
+    @State private var justCopiedID: UUID?
 
     private var filteredEntries: [TranscriptionEntry] {
         if searchText.isEmpty { return entries }
@@ -40,9 +41,13 @@ struct HistoryView: View {
             } else {
                 List {
                     ForEach(filteredEntries) { entry in
-                        HistoryRow(entry: entry)
+                        HistoryRow(entry: entry, justCopied: justCopiedID == entry.id)
                             .contentShape(Rectangle())
-                            .onTapGesture { copyToClipboard(entry.text) }
+                            .onHover { hovering in
+                                if hovering { NSCursor.pointingHand.push() }
+                                else { NSCursor.pop() }
+                            }
+                            .onTapGesture { handleRowTap(entry) }
                     }
                 }
             }
@@ -69,6 +74,18 @@ struct HistoryView: View {
         .frame(minWidth: 400, minHeight: 300)
     }
 
+    private func handleRowTap(_ entry: TranscriptionEntry) {
+        copyToClipboard(entry.text)
+        withAnimation(.easeOut(duration: 0.15)) {
+            justCopiedID = entry.id
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            withAnimation(.easeIn(duration: 0.25)) {
+                if justCopiedID == entry.id { justCopiedID = nil }
+            }
+        }
+    }
+
     private func copyToClipboard(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
@@ -79,6 +96,7 @@ struct HistoryView: View {
 
 struct HistoryRow: View {
     let entry: TranscriptionEntry
+    var justCopied: Bool = false
 
     private var timeString: String {
         let fmt = DateFormatter()
@@ -99,6 +117,12 @@ struct HistoryRow: View {
                         .foregroundColor(.secondary)
                 }
                 Spacer()
+                if justCopied {
+                    Label("Copiado", systemImage: "checkmark.circle.fill")
+                        .font(.caption.weight(.medium))
+                        .foregroundColor(.green)
+                        .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                }
                 Text(String(format: "%.1fs", entry.duration))
                     .font(.caption)
                     .monospacedDigit()
@@ -108,5 +132,6 @@ struct HistoryRow: View {
                 .lineLimit(3)
         }
         .padding(.vertical, 4)
+        .help("Click para copiar al portapapeles")
     }
 }

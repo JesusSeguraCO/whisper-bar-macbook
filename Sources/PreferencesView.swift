@@ -28,6 +28,7 @@ struct PreferencesView: View {
 struct GeneralTab: View {
     @State private var language: String
     @State private var minDuration: Double
+    @State private var pillEnabled: Bool
 
     private let languages = [
         ("es", "Español"), ("en", "English"), ("fr", "Français"),
@@ -38,6 +39,7 @@ struct GeneralTab: View {
     init() {
         _language    = State(initialValue: Config.shared.language)
         _minDuration = State(initialValue: Config.shared.minRecordingDuration)
+        _pillEnabled = State(initialValue: Config.shared.floatingPillEnabled)
     }
 
     var body: some View {
@@ -60,6 +62,20 @@ struct GeneralTab: View {
             }
             .onChange(of: minDuration) { newValue in
                 Config.shared.minRecordingDuration = newValue
+            }
+
+            Divider()
+
+            Section {
+                Toggle("Mostrar pill flotante de micrófono", isOn: $pillEnabled)
+                    .onChange(of: pillEnabled) { newValue in
+                        Config.shared.floatingPillEnabled = newValue
+                        if newValue { PillWindowController.shared.showPill() }
+                        else        { PillWindowController.shared.hidePill() }
+                    }
+                Text("Click para grabar, click de nuevo para transcribir. Arrastra para reposicionar.")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
             }
         }
         .padding()

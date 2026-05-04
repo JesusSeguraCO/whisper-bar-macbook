@@ -106,6 +106,26 @@ class Config {
         set { defaults.set(newValue, forKey: "voiceActionsEnabled") }
     }
 
+    // MARK: - Pill flotante de micrófono
+
+    /// Si el pill flotante (toggle de micrófono) está visible. Por defecto: true.
+    var floatingPillEnabled: Bool {
+        get { defaults.object(forKey: "floatingPillEnabled") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "floatingPillEnabled") }
+    }
+
+    /// Origen X del pill en la pantalla. .nan = sin valor previo (usar default).
+    var floatingPillOriginX: Double {
+        get { (defaults.object(forKey: "floatingPillOriginX") as? Double) ?? .nan }
+        set { defaults.set(newValue, forKey: "floatingPillOriginX") }
+    }
+
+    /// Origen Y del pill en la pantalla. .nan = sin valor previo (usar default).
+    var floatingPillOriginY: Double {
+        get { (defaults.object(forKey: "floatingPillOriginY") as? Double) ?? .nan }
+        set { defaults.set(newValue, forKey: "floatingPillOriginY") }
+    }
+
     /// Nombre legible del idioma por código
     static func languageName(for code: String) -> String {
         let names = [
