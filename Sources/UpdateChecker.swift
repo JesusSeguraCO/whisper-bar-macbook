@@ -1,0 +1,145 @@
+import Foundation
+
+/// Verifica y aplica actualizaciones de Homebrew para whisper-cpp y llama.cpp.
+final class UpdateChecker: ObservableObject {
+    static let shared = UpdateChecker()
+
+    enum PackageState: Equatable {
+        case idle                  // sin verificación iniciada
+        case checking              // corriendo brew outdated
+        case upToDate              // sin actualizaciones
+        case available(String)     // nueva versión disponible
+        case upgrading             // corriendo brew upgrade
+        case upgraded              // upgrade completado exitosamente
+        case error(String)         // error al verificar o actualizar
+    }
+
+    @Published var whisperState: PackageState = .idle
+    @Published var llamaState:   PackageState = .idle
+
+    private var isChecking = false
+    private var lastCheckDate: Date? = nil
+    private let checkInterval: TimeInterval = 3600  // re-verifica como mínimo cada 1h
+
+    private let brewPath: String
+
+    private init() {
+        let candidates = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
+        brewPath = candidates.first {
+            FileManager.default.isExecutableFile(atPath: $0)
+        } ?? "/opt/homebrew/bin/brew"
+    }
+
+    // MARK: - API pública
+
+    /// Verifica actualizaciones. Omite si se verificó recientemente (salvo force: true).
+    func checkForUpdates(force: Bool = false, completion: ((Bool) -> Void)? = nil) {
+        if !force, let last = lastCheckDate,
+           Date().timeIntervalSince(last) < checkInterval {
+            completion?(hasAnyUpdate)
+            return
+        }
+        guard !isChecking else { completion?(hasAnyUpdate); return }
+        isChecking = true
+        whisperState = .checking
+        llamaState   = .checking
+
+        DispatchQueue.global(qos: .background).async { [weak self] in
+            guard let self else { return }
+            let (whisperNew, llamaNew) = self.runOutdatedCheck()
+            DispatchQueue.main.async {
+                self.isChecking = false
+                self.lastCheckDate = Date()
+                self.whisperState = whisperNew.map { .available($0) } ?? .upToDate
+                self.llamaState   = llamaNew.map   { .available($0) } ?? .upToDate
+                completion?(self.hasAnyUpdate)
+            }
+        }
+    }
+
+    func upgradeWhisper() {
+        runUpgrade(package: "whisper-cpp") { [weak self] success in
+            self?.whisperState = success ? .upgraded : .error("Falló la actualización")
+        }
+    }
+
+    func upgradeLlama() {
+        runUpgrade(package: "llama.cpp") { [weak self] success in
+            self?.llamaState = success ? .upgraded : .error("Falló la actualización")
+        }
+    }
+
+    /// True si al menos un paquete tiene actualización disponible.
+    var hasAnyUpdate: Bool {
+        if case .available = whisperState { return true }
+        if case .available = llamaState   { return true }
+        return false
+    }
+
+    // MARK: - Privado
+
+    private func runOutdatedCheck() -> (whisper: String?, llama: String?) {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: brewPath)
+        proc.arguments = ["outdated", "--verbose", "whisper-cpp", "llama.cpp"]
+        proc.environment = brewEnvironment()
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError  = Pipe()
+        try? proc.run()
+        proc.waitUntilExit()
+
+        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(),
+                            encoding: .utf8) ?? ""
+        var whisper: String? = nil
+        var llama:   String? = nil
+
+        for line in output.components(separatedBy: .newlines) where !line.isEmpty {
+            if line.lowercased().contains("whisper-cpp") {
+                whisper = parseNewVersion(from: line)
+            } else if line.lowercased().contains("llama.cpp") {
+                llama = parseNewVersion(from: line)
+            }
+        }
+        return (whisper, llama)
+    }
+
+    /// "whisper-cpp (1.8.4) < 1.8.5" → "1.8.5"
+    private func parseNewVersion(from line: String) -> String {
+        if let range = line.range(of: "< ") {
+            let v = String(line[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+            return v.isEmpty ? "nueva versión" : v
+        }
+        return "nueva versión"
+    }
+
+    private func runUpgrade(package: String, completion: @escaping (Bool) -> Void) {
+        DispatchQueue.main.async {
+            if package.contains("whisper") { self.whisperState = .upgrading }
+            else                           { self.llamaState   = .upgrading }
+        }
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: self.brewPath)
+            proc.arguments = ["upgrade", package]
+            proc.environment = self.brewEnvironment()
+            proc.standardOutput = Pipe()
+            proc.standardError  = Pipe()
+            try? proc.run()
+            proc.waitUntilExit()
+            let success = proc.terminationStatus == 0
+            DispatchQueue.main.async { completion(success) }
+        }
+    }
+
+    private func brewEnvironment() -> [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        env["HOMEBREW_NO_AUTO_UPDATE"] = "1"   // evita que brew actualice su propia DB
+        env["HOMEBREW_NO_ENV_HINTS"]   = "1"
+        let brewBin = URL(fileURLWithPath: brewPath).deletingLastPathComponent().path
+        let currentPath = env["PATH"] ?? "/usr/bin:/bin:/usr/local/bin"
+        env["PATH"] = "\(brewBin):\(currentPath)"
+        return env
+    }
+}

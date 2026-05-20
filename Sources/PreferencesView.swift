@@ -89,6 +89,7 @@ struct GeneralTab: View {
 struct ModelsTab: View {
     @State private var whisperPath: String
     @State private var modelPath: String
+    @ObservedObject private var updater = UpdateChecker.shared
 
     init() {
         _whisperPath = State(initialValue: Config.shared.whisperCliPath)
@@ -109,9 +110,16 @@ struct ModelsTab: View {
                     .onChange(of: modelPath) { newValue in
                         Config.shared.modelPath = newValue
                     }
+
+                UpdateRow(
+                    packageName: "whisper-cpp",
+                    state: updater.whisperState,
+                    onUpdate: { updater.upgradeWhisper() }
+                )
             }
         }
         .padding()
+        .onAppear { updater.checkForUpdates() }
     }
 }
 
@@ -122,6 +130,7 @@ struct LLMTab: View {
     @State private var llmCliPath: String
     @State private var llmModelPath: String
     @State private var llmPrompt: String
+    @ObservedObject private var updater = UpdateChecker.shared
 
     init() {
         _enabled      = State(initialValue: Config.shared.llmEnabled)
@@ -166,6 +175,12 @@ struct LLMTab: View {
                         .foregroundColor(.orange)
                         .font(.caption)
                 }
+
+                UpdateRow(
+                    packageName: "llama.cpp",
+                    state: updater.llamaState,
+                    onUpdate: { updater.upgradeLlama() }
+                )
             }
             .disabled(!enabled)
 
@@ -180,6 +195,7 @@ struct LLMTab: View {
             .disabled(!enabled)
         }
         .padding()
+        .onAppear { updater.checkForUpdates() }
     }
 }
 
@@ -450,6 +466,69 @@ struct ShortcutsTab: View {
                 .font(.caption)
         }
         .padding()
+    }
+}
+
+// MARK: - Componente de actualización
+
+struct UpdateRow: View {
+    let packageName: String
+    let state: UpdateChecker.PackageState
+    let onUpdate: () -> Void
+
+    var body: some View {
+        switch state {
+        case .idle, .upToDate:
+            EmptyView()
+
+        case .checking:
+            HStack(spacing: 6) {
+                ProgressView().scaleEffect(0.65)
+                Text("Verificando actualizaciones…")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            }
+
+        case .available(let version):
+            HStack {
+                Image(systemName: "arrow.up.circle.fill")
+                    .foregroundColor(.orange)
+                Text("Actualización disponible: \(version)")
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                Spacer()
+                Button("Actualizar") { onUpdate() }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+                    .controlSize(.small)
+            }
+
+        case .upgrading:
+            HStack(spacing: 6) {
+                ProgressView().scaleEffect(0.65)
+                Text("Actualizando \(packageName)… esto puede tomar un minuto")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            }
+
+        case .upgraded:
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                Text("\(packageName) actualizado correctamente")
+                    .font(.caption)
+                    .foregroundColor(.green)
+            }
+
+        case .error(let msg):
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .foregroundColor(.red)
+                Text(msg)
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
+        }
     }
 }
 

@@ -95,6 +95,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             notify("⚠️ Configuración incompleta — abre el menú para ver el estado")
         }
 
+        // Verificar actualizaciones de Homebrew en segundo plano (sin bloquear el inicio).
+        DispatchQueue.global(qos: .background).asyncAfter(deadline: .now() + 8) {
+            UpdateChecker.shared.checkForUpdates { hasUpdate in
+                guard hasUpdate else { return }
+                self.notify("⬆ Hay actualizaciones disponibles — abre Preferencias → Modelos o Corrección LLM")
+            }
+        }
+
         // Verifica permiso de Accesibilidad. Sin él: no funciona el hotkey global
         // ni el paste vía Cmd+V (ambos requieren posteo de eventos / event tap).
         // Tras cada rebuild ad-hoc el cdhash cambia y macOS puede revocar este permiso.
