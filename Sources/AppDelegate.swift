@@ -45,8 +45,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         setupMenuBar()
+
+        // Secuenciar peticiones de permisos para que no se encimen en el arranque.
+        // Micrófono primero; notificaciones y accesibilidad con retardo para no
+        // solapar los diálogos del sistema y evitar que se pierdan ventanas al
+        // cambiar el foco entre diálogos.
         AudioRecorder.requestPermission { _ in }
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        }
 
         // Callback para actualizar menú cuando la ventana flotante cambia de estado
         FloatingTranscriptionWindowController.shared.onWindowStateChanged = { [weak self] in
@@ -108,15 +116,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Verifica permiso de Accesibilidad. Sin él: no funciona el hotkey global
         // ni el paste vía Cmd+V (ambos requieren posteo de eventos / event tap).
         // Tras cada rebuild ad-hoc el cdhash cambia y macOS puede revocar este permiso.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        // Se retarda 2 s para que el diálogo de micrófono (0 s) y notificaciones (1 s)
+        // ya hayan sido descartados antes de mostrar este alert.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
             self?.checkAccessibilityPermission()
         }
     }
 
     private func checkAccessibilityPermission() {
-        let trusted = AXIsProcessTrusted()
-        if !trusted {
-            notify("⚠️ WhisperBar necesita Accesibilidad — Ajustes → Privacidad → Accesibilidad")
+        guard !AXIsProcessTrusted() else { return }
+
+        // Mostrar un NSAlert nativo (igual que el diálogo de micrófono) explicando
+        // el permiso antes de abrir Configuración del Sistema.
+        let alert = NSAlert()
+        alert.messageText = "WhisperBar necesita Accesibilidad"
+        alert.informativeText = """
+            Este permiso es necesario para dos cosas:
+
+            • Detectar el atajo de teclado ⌘⌥ de forma global.
+            • Pegar el texto transcrito en la app donde está el cursor.
+
+            Sin él el dictado no funcionará. Puedes activarlo en:
+            Configuración del Sistema → Privacidad y Seguridad → Accesibilidad.
+            """
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Abrir Configuración del Sistema")
+        alert.addButton(withTitle: "Más tarde")
+
+        NSApp.activate(ignoringOtherApps: true)
+        let response = alert.runModal()
+
+        if response == .alertFirstButtonReturn {
+            // AXIsProcessTrustedWithOptions con prompt=true abre System Settings
+            // directamente en la sección de Accesibilidad (comportamiento nativo).
+            let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+                as CFDictionary
+            _ = AXIsProcessTrustedWithOptions(opts)
         }
     }
 
