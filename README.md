@@ -25,7 +25,8 @@ Suelta     →  ⏳ transcribe  →  📋 pega donde está el cursor
 - **Panel de preferencias nativo** — configura todo desde una ventana SwiftUI (sin tocar terminal)
 - **Historial de transcripciones** — busca y reutiliza transcripciones anteriores
 - **Preserva el clipboard** — restaura lo que tenías copiado tras pegar
-- **Feedback sonoro** — sonido binaural relajante mientras transcribe
+- **Feedback sonoro configurable** — sonido binaural relajante mientras transcribe; activable/desactivable con control de volumen
+- **Cancelación en cualquier momento** — pulsa `Esc` o el botón `✕` del pill para cancelar sin pegar
 - **Auto-detección de rutas** — encuentra whisper-cli, modelos y llama-cli automáticamente
 - **Apple Silicon e Intel** — el script de build detecta la arquitectura
 - **Open source** — código modular, fácil de extender y contribuir
@@ -182,6 +183,8 @@ xattr -dr com.apple.quarantine ~/Applications/WhisperBar.app
 4. **Suelta** — escucharás un sonido relajante mientras transcribe
 5. El texto aparece en el cursor automáticamente
 
+**Para cancelar** (sin pegar nada): pulsa `Esc` en cualquier momento durante la grabación o la transcripción, o haz clic en el botón `✕` del pill flotante.
+
 El menú muestra el estado de la configuración en tiempo real (✅/❌) y da acceso a:
 - **Preferencias** (`⌘,`) — configuración visual completa
 - **Historial** (`⌘H`) — transcripciones anteriores con búsqueda
@@ -198,7 +201,7 @@ Desde el menú de WhisperBar → **Preferencias…** (`⌘,`):
 |----------|----------|
 | General  | Idioma de transcripción, duración mínima de grabación |
 | Modelos  | Rutas de whisper-cli y modelo, activar/configurar LLM |
-| Audio    | Dispositivo de entrada (próximamente) |
+| Audio    | Activar/desactivar sonido binaural · Control de volumen |
 | Atajos   | Atajo de grabación actual |
 
 ### Terminal (alternativa)
@@ -218,6 +221,12 @@ defaults write com.user.WhisperBar llmPrompt "Tu prompt aquí"
 
 # Duración mínima de grabación en segundos
 defaults write com.user.WhisperBar minRecordingDuration 0.5
+
+# Desactivar sonido binaural durante transcripción
+defaults write com.user.WhisperBar audioFeedbackEnabled -bool false
+
+# Volumen del sonido binaural (0.0 – 1.0)
+defaults write com.user.WhisperBar audioFeedbackVolume 0.5
 ```
 
 Reinicia la app después de cambiar la configuración por terminal:
