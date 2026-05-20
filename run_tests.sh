@@ -45,6 +45,7 @@ swiftc \
     -framework ApplicationServices \
     -framework SwiftUI \
     -framework CoreGraphics \
+    -framework UserNotifications \
     -target "$TARGET"
 
 echo "→ Compilación exitosa"

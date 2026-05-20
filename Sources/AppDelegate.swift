@@ -1,5 +1,6 @@
 import Cocoa
 import CoreGraphics
+import UserNotifications
 
 /// Coordina todos los módulos y gestiona la barra de menú.
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -45,6 +46,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         setupMenuBar()
         AudioRecorder.requestPermission { _ in }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
 
         // Callback para actualizar menú cuando la ventana flotante cambia de estado
         FloatingTranscriptionWindowController.shared.onWindowStateChanged = { [weak self] in
@@ -554,13 +556,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Notificaciones
 
     private func notify(_ msg: String) {
-        let escaped = msg.replacingOccurrences(of: "\"", with: "\\\"")
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        proc.arguments = ["-e", "display notification \"\(escaped)\" with title \"WhisperBar\""]
-        proc.standardOutput = Pipe()
-        proc.standardError  = Pipe()
-        try? proc.run()
+        let content = UNMutableNotificationContent()
+        content.title = "WhisperBar"
+        content.body  = msg
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
     }
 
     @objc private func openPreferences() {

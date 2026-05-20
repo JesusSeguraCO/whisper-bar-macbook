@@ -44,6 +44,7 @@ swiftc \
     -framework AVFoundation \
     -framework ApplicationServices \
     -framework SwiftUI \
+    -framework UserNotifications \
     -target "$TARGET"
 
 echo "→ Creando bundle..."
