@@ -29,6 +29,7 @@ private enum Neon {
 struct PillView: View {
     @ObservedObject var model: PillViewModel
     var onTap: () -> Void
+    var onCancel: () -> Void
 
     @State private var isHovering: Bool = false
 
@@ -78,8 +79,8 @@ struct PillView: View {
     private func content(time: TimeInterval) -> some View {
         switch model.state {
         case .idle:         IdleContent(time: time)
-        case .recording:    RecordingContent(time: time)
-        case .transcribing: TranscribingContent(time: time)
+        case .recording:    RecordingContent(time: time, onCancel: onCancel)
+        case .transcribing: TranscribingContent(time: time, onCancel: onCancel)
         }
     }
 
@@ -179,8 +180,8 @@ struct PillView: View {
     private var helpText: String {
         switch model.state {
         case .idle:         return "Click para grabar"
-        case .recording:    return "Click para detener y transcribir"
-        case .transcribing: return "Procesando…"
+        case .recording:    return "Click para detener y transcribir · Esc o ✕ para cancelar"
+        case .transcribing: return "Procesando… · Esc o ✕ para cancelar"
         }
     }
 }
@@ -212,6 +213,7 @@ private struct IdleContent: View {
 
 private struct RecordingContent: View {
     let time: TimeInterval
+    let onCancel: () -> Void
 
     var body: some View {
         // Punto rojo pulsante
@@ -231,6 +233,8 @@ private struct RecordingContent: View {
                 .shadow(color: .black.opacity(0.25), radius: 1)
 
             WaveformBars(time: time)
+
+            CancelButton(action: onCancel)
         }
     }
 }
@@ -261,6 +265,7 @@ private struct WaveformBars: View {
 
 private struct TranscribingContent: View {
     let time: TimeInterval
+    let onCancel: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
@@ -272,6 +277,8 @@ private struct TranscribingContent: View {
                 .foregroundColor(.white)
                 .tracking(0.3)
             DotsLoader(time: time)
+
+            CancelButton(action: onCancel)
         }
     }
 }
@@ -299,5 +306,22 @@ private struct DotsLoader: View {
     private func scale(for index: Int) -> CGFloat {
         let phase = time * 3.5 + Double(index) * 0.5
         return 0.85 + CGFloat(sin(phase) * 0.5 + 0.5) * 0.4
+    }
+}
+
+/// Botón ✕ para cancelar grabación o transcripción.
+/// Se diferencia del área principal del pill para que no active el onTap.
+private struct CancelButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white.opacity(0.80))
+                .shadow(color: .black.opacity(0.3), radius: 2)
+        }
+        .buttonStyle(.plain)
+        .help("Cancelar (Esc)")
     }
 }

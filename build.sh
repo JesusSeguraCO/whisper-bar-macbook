@@ -37,12 +37,14 @@ swiftc \
     "$DIR/Sources/TranscriptionHistory.swift" \
     "$DIR/Sources/HistoryView.swift" \
     "$DIR/Sources/HistoryWindowController.swift" \
+    "$DIR/Sources/UpdateChecker.swift" \
     "$DIR/Sources/AppDelegate.swift" \
     -o "$DIR/WhisperBar_bin" \
     -framework Cocoa \
     -framework AVFoundation \
     -framework ApplicationServices \
     -framework SwiftUI \
+    -framework UserNotifications \
     -target "$TARGET"
 
 echo "→ Creando bundle..."

@@ -25,7 +25,8 @@ Suelta     →  ⏳ transcribe  →  📋 pega donde está el cursor
 - **Panel de preferencias nativo** — configura todo desde una ventana SwiftUI (sin tocar terminal)
 - **Historial de transcripciones** — busca y reutiliza transcripciones anteriores
 - **Preserva el clipboard** — restaura lo que tenías copiado tras pegar
-- **Feedback sonoro** — sonido binaural relajante mientras transcribe
+- **Feedback sonoro personalizable** — elige entre 6 presets por categoría (relajante, concentración, energético, neutro) o sube tu propio archivo de audio; control de volumen y previsualización integrada
+- **Cancelación en cualquier momento** — pulsa `Esc` o el botón `✕` del pill para cancelar sin pegar
 - **Auto-detección de rutas** — encuentra whisper-cli, modelos y llama-cli automáticamente
 - **Apple Silicon e Intel** — el script de build detecta la arquitectura
 - **Open source** — código modular, fácil de extender y contribuir
@@ -182,6 +183,8 @@ xattr -dr com.apple.quarantine ~/Applications/WhisperBar.app
 4. **Suelta** — escucharás un sonido relajante mientras transcribe
 5. El texto aparece en el cursor automáticamente
 
+**Para cancelar** (sin pegar nada): pulsa `Esc` en cualquier momento durante la grabación o la transcripción, o haz clic en el botón `✕` del pill flotante.
+
 El menú muestra el estado de la configuración en tiempo real (✅/❌) y da acceso a:
 - **Preferencias** (`⌘,`) — configuración visual completa
 - **Historial** (`⌘H`) — transcripciones anteriores con búsqueda
@@ -198,7 +201,7 @@ Desde el menú de WhisperBar → **Preferencias…** (`⌘,`):
 |----------|----------|
 | General  | Idioma de transcripción, duración mínima de grabación |
 | Modelos  | Rutas de whisper-cli y modelo, activar/configurar LLM |
-| Audio    | Dispositivo de entrada (próximamente) |
+| Audio    | Activar/desactivar · Volumen · Selector de preset por categoría · Archivo personalizado · Previsualización |
 | Atajos   | Atajo de grabación actual |
 
 ### Terminal (alternativa)
@@ -218,6 +221,18 @@ defaults write com.user.WhisperBar llmPrompt "Tu prompt aquí"
 
 # Duración mínima de grabación en segundos
 defaults write com.user.WhisperBar minRecordingDuration 0.5
+
+# Desactivar sonido durante transcripción
+defaults write com.user.WhisperBar audioFeedbackEnabled -bool false
+
+# Volumen (0.0 – 1.0)
+defaults write com.user.WhisperBar audioFeedbackVolume 0.5
+
+# Preset de sonido: theta | deep | 528hz | alpha | beta | 432hz | custom
+defaults write com.user.WhisperBar audioFeedbackPreset "alpha"
+
+# Ruta a archivo de audio personalizado (cuando preset = custom)
+defaults write com.user.WhisperBar audioFeedbackCustomPath "/ruta/a/mi-sonido.mp3"
 ```
 
 Reinicia la app después de cambiar la configuración por terminal:

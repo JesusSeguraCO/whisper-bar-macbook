@@ -877,6 +877,47 @@ func testConfigFloatingPillDefaults() {
     else { defaults.removeObject(forKey: "floatingPillOriginY") }
 }
 
+func testConfigAudioFeedback() {
+    suite("Config — Audio Feedback defaults & persistence")
+    let defaults = UserDefaults.standard
+    let savedEnabled = defaults.object(forKey: "audioFeedbackEnabled")
+    let savedVolume  = defaults.object(forKey: "audioFeedbackVolume")
+
+    // Defaults
+    defaults.removeObject(forKey: "audioFeedbackEnabled")
+    defaults.removeObject(forKey: "audioFeedbackVolume")
+    assertEqual(Config.shared.audioFeedbackEnabled, true,
+        "audioFeedbackEnabled default = true")
+    assertEqual(Config.shared.audioFeedbackVolume, 1.0,
+        "audioFeedbackVolume default = 1.0")
+
+    // Round-trip
+    Config.shared.audioFeedbackEnabled = false
+    assertEqual(Config.shared.audioFeedbackEnabled, false,
+        "audioFeedbackEnabled persiste setter false")
+    Config.shared.audioFeedbackVolume = 0.5
+    assertEqual(Config.shared.audioFeedbackVolume, 0.5,
+        "audioFeedbackVolume persiste 0.5")
+
+    // Restaurar estado original
+    if let v = savedEnabled { defaults.set(v, forKey: "audioFeedbackEnabled") }
+    else { defaults.removeObject(forKey: "audioFeedbackEnabled") }
+    if let v = savedVolume { defaults.set(v, forKey: "audioFeedbackVolume") }
+    else { defaults.removeObject(forKey: "audioFeedbackVolume") }
+}
+
+func testPillCancelCallback() {
+    suite("PillWindowController — Cancel callback")
+    let wc = PillWindowController.shared
+    assert(wc.onPillCancelTapped == nil, "onPillCancelTapped inicial es nil")
+    var cancelCalled = false
+    wc.onPillCancelTapped = { cancelCalled = true }
+    assert(wc.onPillCancelTapped != nil, "onPillCancelTapped se puede asignar")
+    wc.onPillCancelTapped?()
+    assert(cancelCalled, "onPillCancelTapped callback se invoca correctamente")
+    wc.onPillCancelTapped = nil
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // MARK: - RUNNER
 // ══════════════════════════════════════════════════════════════════════════════
@@ -912,6 +953,8 @@ struct TestRunner {
         testPillStateTransitions()
         testPillWindowControllerVisibility()
         testConfigFloatingPillDefaults()
+        testConfigAudioFeedback()
+        testPillCancelCallback()
 
         // Summary
         print("\n\u{001B}[1;35m══════════════════════════════════════════════════════════════\u{001B}[0m")
