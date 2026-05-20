@@ -330,7 +330,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Cancela la grabación o transcripción en curso sin pegar nada.
     func cancelRecording() {
-        guard recorder.isRecording || audioFeedback.isPlaying || isCancelled == false else { return }
+        // Solo cancela si hay una operación activa y no se canceló ya.
+        // El guard previo permitía ejecutar la cancelación en estado idle porque
+        // `isCancelled == false` siempre es verdadero en arranque.
+        guard !isCancelled, recorder.isRecording || audioFeedback.isPlaying else { return }
         isCancelled = true
         if recorder.isRecording {
             recorder.stop()
