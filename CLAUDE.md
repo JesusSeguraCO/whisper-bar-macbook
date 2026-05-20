@@ -104,8 +104,11 @@ The app follows a **modular, single-responsibility** design:
 - Singleton with JSON serialization to Application Support directory
 - Limits history to maxHistoryCount (default 100)
 
-**AudioFeedback.swift** — Binaural tone during transcription
-- Provides auditory feedback while waiting for transcription to complete
+**AudioFeedback.swift** — Sound feedback during transcription
+- Defines `AudioPreset` struct: 6 built-in presets (theta/alpha/beta binaurals, 432Hz, 528Hz, deep drone) + custom file mode
+- Presets synthesized via AVAudioEngine with PCM buffer (1s loop); custom files played via AVAudioPlayer
+- `preview(presetId:volume:)` plays 3 seconds for in-Preferences auditioning; uses a separate timer, safe to call concurrently
+- `start()` reads `Config.audioFeedbackPreset` and `audioFeedbackCustomPath` at call time
 
 ### Data Flow
 
@@ -147,8 +150,10 @@ All settings stored in `com.user.WhisperBar` UserDefaults domain:
 - `floatingPillEnabled`, `floatingPillOriginX/Y` — floating button state & position
 - `streamStepMs`, `streamLengthMs`, `streamKeepMs` — streaming parameters
 - `maxHistoryCount` — history size limit
-- `audioFeedbackEnabled` — play binaural tone while transcribing (default: true)
-- `audioFeedbackVolume` — tone volume 0.0–1.0 (default: 1.0, matches original amplitude)
+- `audioFeedbackEnabled` — play sound while transcribing (default: true)
+- `audioFeedbackVolume` — volume 0.0–1.0 (default: 1.0)
+- `audioFeedbackPreset` — preset ID: `theta` | `deep` | `528hz` | `alpha` | `beta` | `432hz` | `custom` (default: `theta`)
+- `audioFeedbackCustomPath` — path to user-supplied audio file (used when preset = `custom`)
 
 ## Build & Development
 

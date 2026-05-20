@@ -191,19 +191,31 @@ class Config {
 
     // MARK: - Audio Feedback
 
-    /// Si el sonido binaural durante transcripción está habilitado
+    /// Si el sonido de feedback durante transcripción está habilitado
     var audioFeedbackEnabled: Bool {
         get { defaults.object(forKey: "audioFeedbackEnabled") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "audioFeedbackEnabled") }
     }
 
-    /// Volumen del sonido binaural (0.0 – 1.0). Default: 1.0 (máximo original)
+    /// Volumen del sonido de feedback (0.0 – 1.0). Default: 1.0
     var audioFeedbackVolume: Double {
         get {
             let v = defaults.double(forKey: "audioFeedbackVolume")
             return v > 0 ? v : 1.0
         }
         set { defaults.set(newValue, forKey: "audioFeedbackVolume") }
+    }
+
+    /// ID del preset de audio seleccionado (ver AudioPreset.all). Default: "theta"
+    var audioFeedbackPreset: String {
+        get { defaults.string(forKey: "audioFeedbackPreset") ?? "theta" }
+        set { defaults.set(newValue, forKey: "audioFeedbackPreset") }
+    }
+
+    /// Ruta al archivo de audio personalizado (vacío = ninguno)
+    var audioFeedbackCustomPath: String {
+        get { defaults.string(forKey: "audioFeedbackCustomPath") ?? "" }
+        set { defaults.set(newValue, forKey: "audioFeedbackCustomPath") }
     }
 
     // MARK: - Validación
