@@ -46,14 +46,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         setupMenuBar()
 
-        // Secuenciar peticiones de permisos para que no se encimen en el arranque.
-        // Micrófono primero; notificaciones y accesibilidad con retardo para no
-        // solapar los diálogos del sistema y evitar que se pierdan ventanas al
-        // cambiar el foco entre diálogos.
-        AudioRecorder.requestPermission { _ in }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        // Permisos encadenados: cada uno espera al anterior para no solapar diálogos.
+        // Si el permiso ya fue concedido, el callback se llama de inmediato (sin diálogo)
+        // y la cadena avanza sin mostrar nada al usuario.
+        AudioRecorder.requestPermission { [weak self] _ in
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                    self?.checkAccessibilityPermission()
+                }
+            }
         }
 
         // Callback para actualizar menú cuando la ventana flotante cambia de estado
@@ -113,14 +114,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Verifica permiso de Accesibilidad. Sin él: no funciona el hotkey global
-        // ni el paste vía Cmd+V (ambos requieren posteo de eventos / event tap).
-        // Tras cada rebuild ad-hoc el cdhash cambia y macOS puede revocar este permiso.
-        // Se retarda 2 s para que el diálogo de micrófono (0 s) y notificaciones (1 s)
-        // ya hayan sido descartados antes de mostrar este alert.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            self?.checkAccessibilityPermission()
-        }
     }
 
     private func checkAccessibilityPermission() {

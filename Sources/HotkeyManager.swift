@@ -18,7 +18,6 @@ class HotkeyManager {
 
     private var flagsMonitor: Any?
     private var retryTimer:   DispatchSourceTimer?
-    private var hasPrompted   = false
 
     /// Máscara de modificadores relevantes (ignora caps lock, fn, etc.)
     private let relevantMask: NSEvent.ModifierFlags = [.command, .option, .shift, .control]
@@ -47,14 +46,9 @@ class HotkeyManager {
     // MARK: - Privado
 
     private func checkAndRegister() {
-        if !hasPrompted {
-            let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-                as CFDictionary
-            hasPrompted = true
-            if AXIsProcessTrustedWithOptions(opts) { startMonitor(); return }
-        } else {
-            if AXIsProcessTrusted() { startMonitor(); return }
-        }
+        // Solo verifica silenciosamente; la UI de permisos la gestiona AppDelegate
+        // para evitar múltiples diálogos simultáneos al arrancar.
+        if AXIsProcessTrusted() { startMonitor(); return }
         scheduleRetry()
     }
 
