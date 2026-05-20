@@ -35,6 +35,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Monitor global del teclado activo sólo mientras se graba o transcribe.
     private var escKeyMonitor: Any?
 
+    /// Evita mostrar el diálogo de Accesibilidad más de una vez por sesión.
+    private var hasPromptedForAccessibility = false
+
     // MARK: - Animación de grabación
 
     private var animTimer: Timer?
@@ -117,35 +120,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func checkAccessibilityPermission() {
-        guard !AXIsProcessTrusted() else { return }
+        guard !AXIsProcessTrusted(), !hasPromptedForAccessibility else { return }
+        hasPromptedForAccessibility = true
 
-        // Mostrar un NSAlert nativo (igual que el diálogo de micrófono) explicando
-        // el permiso antes de abrir Configuración del Sistema.
-        let alert = NSAlert()
-        alert.messageText = "WhisperBar necesita Accesibilidad"
-        alert.informativeText = """
-            Este permiso es necesario para dos cosas:
-
-            • Detectar el atajo de teclado ⌘⌥ de forma global.
-            • Pegar el texto transcrito en la app donde está el cursor.
-
-            Sin él el dictado no funcionará. Puedes activarlo en:
-            Configuración del Sistema → Privacidad y Seguridad → Accesibilidad.
-            """
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Abrir Configuración del Sistema")
-        alert.addButton(withTitle: "Más tarde")
-
+        // AXIsProcessTrustedWithOptions con prompt=true muestra el diálogo nativo
+        // del sistema ("WhisperBar quiere controlar esta computadora") y abre
+        // Configuración del Sistema → Accesibilidad cuando el usuario lo acepta.
+        // Activar la app primero garantiza que el diálogo aparezca en primer plano.
         NSApp.activate(ignoringOtherApps: true)
-        let response = alert.runModal()
-
-        if response == .alertFirstButtonReturn {
-            // AXIsProcessTrustedWithOptions con prompt=true abre System Settings
-            // directamente en la sección de Accesibilidad (comportamiento nativo).
-            let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-                as CFDictionary
-            _ = AXIsProcessTrustedWithOptions(opts)
-        }
+        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+            as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(opts)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
