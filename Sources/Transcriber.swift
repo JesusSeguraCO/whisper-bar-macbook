@@ -5,6 +5,7 @@ class Transcriber {
 
     private let config = Config.shared
     private let timeout: TimeInterval = 60
+    private var currentProcess: Process?
 
     enum TranscriberError: LocalizedError {
         case invalidConfig(whisperCli: String, model: String)
@@ -20,6 +21,14 @@ class Transcriber {
         }
     }
 
+    // MARK: - Cancelación
+
+    /// Termina el proceso de transcripción en curso. Thread-safe.
+    func cancel() {
+        currentProcess?.terminate()
+        currentProcess = nil
+    }
+
     // MARK: - Transcripción
 
     /// Transcribe el archivo en `url` y devuelve el texto limpio.
@@ -32,6 +41,7 @@ class Transcriber {
         }
 
         let proc = Process()
+        currentProcess = proc
         proc.executableURL = URL(fileURLWithPath: config.whisperCliPath)
         proc.arguments = [
             "-m", config.modelPath,
@@ -44,7 +54,10 @@ class Transcriber {
         proc.standardOutput = outPipe
         proc.standardError  = Pipe()
 
-        do { try proc.run() } catch { return .failure(error) }
+        do { try proc.run() } catch {
+            currentProcess = nil
+            return .failure(error)
+        }
 
         // Timeout: evita que la app se cuelgue si whisper-cli falla silenciosamente
         let sem = DispatchSemaphore(value: 0)
@@ -52,8 +65,11 @@ class Transcriber {
 
         if sem.wait(timeout: .now() + timeout) == .timedOut {
             proc.terminate()
+            currentProcess = nil
             return .failure(TranscriberError.timeout)
         }
+
+        currentProcess = nil
 
         let raw = String(data: outPipe.fileHandleForReading.readDataToEndOfFile(),
                          encoding: .utf8) ?? ""

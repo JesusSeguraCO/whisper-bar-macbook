@@ -20,6 +20,7 @@ class AudioFeedback {
 
     func start() {
         guard !isPlaying else { return }
+        guard Config.shared.audioFeedbackEnabled else { return }
         let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!
         engine.attach(player)
         engine.attach(mixer)
@@ -30,7 +31,8 @@ class AudioFeedback {
         player.scheduleBuffer(makeBuffer(), at: nil, options: .loops)
         player.play()
         isPlaying = true
-        fadeVolume(to: amplitude * 1.0, duration: 1.2)   // fade-in suave
+        let targetVolume = amplitude * Float(Config.shared.audioFeedbackVolume)
+        fadeVolume(to: targetVolume, duration: 1.2)   // fade-in suave
     }
 
     func stop() {

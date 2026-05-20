@@ -276,16 +276,57 @@ struct VoiceActionsTab: View {
     }
 }
 
-// MARK: - Audio (placeholder)
+// MARK: - Audio Feedback
 
 struct AudioTab: View {
+    @State private var feedbackEnabled: Bool
+    @State private var feedbackVolume: Double
+
+    init() {
+        _feedbackEnabled = State(initialValue: Config.shared.audioFeedbackEnabled)
+        _feedbackVolume  = State(initialValue: Config.shared.audioFeedbackVolume)
+    }
+
     var body: some View {
         Form {
-            Text("Dispositivo de entrada: Default del sistema")
-                .foregroundColor(.secondary)
-            Text("Configuración de dispositivo estará disponible próximamente.")
-                .foregroundColor(.secondary)
-                .italic()
+            Section("Sonido de procesamiento") {
+                Toggle("Reproducir sonido binaural mientras transcribe", isOn: $feedbackEnabled)
+                    .onChange(of: feedbackEnabled) { newValue in
+                        Config.shared.audioFeedbackEnabled = newValue
+                    }
+
+                Text("Tono relajante (binaural theta 4 Hz) que suena mientras WhisperBar procesa el audio. Funciona mejor con auriculares.")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Section("Volumen") {
+                HStack {
+                    Image(systemName: "speaker.fill")
+                        .foregroundColor(.secondary)
+                    Slider(value: $feedbackVolume, in: 0.0...1.0, step: 0.05)
+                        .disabled(!feedbackEnabled)
+                    Image(systemName: "speaker.wave.3.fill")
+                        .foregroundColor(.secondary)
+                    Text("\(Int(feedbackVolume * 100))%")
+                        .monospacedDigit()
+                        .frame(width: 40, alignment: .trailing)
+                }
+                .onChange(of: feedbackVolume) { newValue in
+                    Config.shared.audioFeedbackVolume = newValue
+                }
+                .opacity(feedbackEnabled ? 1.0 : 0.4)
+            }
+
+            Section("Dispositivo de entrada") {
+                Text("Dispositivo de entrada: Default del sistema")
+                    .foregroundColor(.secondary)
+                Text("Selección de dispositivo estará disponible próximamente.")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+                    .italic()
+            }
         }
         .padding()
     }

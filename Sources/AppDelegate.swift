@@ -28,6 +28,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// la app destino puede perder foco efectivo y Cmd+V no llegaría al editor.
     private var pasteTargetApp: NSRunningApplication?
 
+    /// Bandera de cancelación: impide el paste si el usuario canceló durante transcripción.
+    private var isCancelled = false
+
+    /// Monitor global del teclado activo sólo mientras se graba o transcribe.
+    private var escKeyMonitor: Any?
+
     // MARK: - Animación de grabación
 
     private var animTimer: Timer?
@@ -48,6 +54,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Pill flotante de micrófono (toggle de grabación)
         PillWindowController.shared.onPillTapped = { [weak self] in
             DispatchQueue.main.async { self?.handlePillTap() }
+        }
+        PillWindowController.shared.onPillCancelTapped = { [weak self] in
+            DispatchQueue.main.async { self?.cancelRecording() }
         }
         PillWindowController.shared.onPillHiddenByUser = { [weak self] in
             DispatchQueue.main.async { self?.rebuildMenu() }
@@ -282,14 +291,48 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if pasteTargetApp == nil {
             pasteTargetApp = currentPasteTarget()
         }
+        isCancelled = false
+        registerEscMonitor()
         do {
             try recorder.start()
             startRecordingAnimation()
             PillWindowController.shared.setState(.recording)
         } catch {
             notify("Error al iniciar grabación: \(error.localizedDescription)")
+            removeEscMonitor()
             PillWindowController.shared.setState(.idle)
             pasteTargetApp = nil
+        }
+    }
+
+    /// Cancela la grabación o transcripción en curso sin pegar nada.
+    func cancelRecording() {
+        guard recorder.isRecording || audioFeedback.isPlaying || isCancelled == false else { return }
+        isCancelled = true
+        if recorder.isRecording {
+            recorder.stop()
+        }
+        transcriber.cancel()
+        audioFeedback.stop()
+        stopRecordingAnimation()
+        removeEscMonitor()
+        resetIdleUI()
+    }
+
+    // MARK: - Monitor de tecla Escape
+
+    private func registerEscMonitor() {
+        guard escKeyMonitor == nil else { return }
+        escKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53 else { return }  // 53 = Escape
+            DispatchQueue.main.async { self?.cancelRecording() }
+        }
+    }
+
+    private func removeEscMonitor() {
+        if let monitor = escKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            escKeyMonitor = nil
         }
     }
 
@@ -302,6 +345,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Restaura UI a estado idle (icono menubar + pill) y limpia destino del paste.
     private func resetIdleUI() {
+        removeEscMonitor()
         setIconEmoji("🎙")
         PillWindowController.shared.setState(.idle)
         pasteTargetApp = nil
@@ -328,6 +372,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             switch self.transcriber.transcribe(url: audioURL) {
             case .success(let text) where !text.isEmpty:
+                guard !self.isCancelled else {
+                    DispatchQueue.main.async { self.audioFeedback.stop() }
+                    return
+                }
                 // LLM post-procesamiento (retorna texto original si está deshabilitado)
                 self.setIconEmoji("🧠")
                 let finalText: String
@@ -339,6 +387,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     finalText = text
                 }
                 DispatchQueue.main.async { self.audioFeedback.stop() }
+
+                guard !self.isCancelled else { return }
 
                 // Detección de acciones por voz
                 if self.config.voiceActionsEnabled {
@@ -369,10 +419,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             case .failure(let error):
                 DispatchQueue.main.async { self.audioFeedback.stop() }
+                guard !self.isCancelled else { return }
                 self.notify("Error: \(error.localizedDescription)")
                 self.resetIdleUI()
             default:
                 DispatchQueue.main.async { self.audioFeedback.stop() }
+                guard !self.isCancelled else { return }
                 self.resetIdleUI()
             }
         }
@@ -402,16 +454,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             switch self.translator.translate(audioURL: audioURL) {
             case .success(let text) where !text.isEmpty:
                 DispatchQueue.main.async { self.audioFeedback.stop() }
+                guard !self.isCancelled else { return }
                 let sourceApp = NSWorkspace.shared.frontmostApplication?.localizedName
                 let entry = TranscriptionEntry(text: text, duration: duration, sourceApp: sourceApp)
                 self.history.add(entry)
                 self.paste(text: text)
             case .failure(let error):
                 DispatchQueue.main.async { self.audioFeedback.stop() }
+                guard !self.isCancelled else { return }
                 self.notify("Traducción error: \(error.localizedDescription)")
                 self.resetIdleUI()
             default:
                 DispatchQueue.main.async { self.audioFeedback.stop() }
+                guard !self.isCancelled else { return }
                 self.resetIdleUI()
             }
         }

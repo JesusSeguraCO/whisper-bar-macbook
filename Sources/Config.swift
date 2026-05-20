@@ -189,6 +189,23 @@ class Config {
         set { defaults.set(newValue, forKey: "maxHistoryCount") }
     }
 
+    // MARK: - Audio Feedback
+
+    /// Si el sonido binaural durante transcripción está habilitado
+    var audioFeedbackEnabled: Bool {
+        get { defaults.object(forKey: "audioFeedbackEnabled") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "audioFeedbackEnabled") }
+    }
+
+    /// Volumen del sonido binaural (0.0 – 1.0). Default: 1.0 (máximo original)
+    var audioFeedbackVolume: Double {
+        get {
+            let v = defaults.double(forKey: "audioFeedbackVolume")
+            return v > 0 ? v : 1.0
+        }
+        set { defaults.set(newValue, forKey: "audioFeedbackVolume") }
+    }
+
     // MARK: - Validación
 
     var isWhisperCliValid: Bool {

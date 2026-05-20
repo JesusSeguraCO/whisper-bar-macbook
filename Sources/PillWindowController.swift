@@ -32,6 +32,9 @@ final class PillWindowController: NSObject, NSWindowDelegate {
     /// Callback disparado cuando el usuario hace click izquierdo en el pill.
     var onPillTapped: (() -> Void)?
 
+    /// Callback disparado cuando el usuario pulsa el botón ✕ del pill.
+    var onPillCancelTapped: (() -> Void)?
+
     /// Callback disparado cuando el usuario oculta el pill desde el menú contextual.
     var onPillHiddenByUser: (() -> Void)?
 
@@ -62,7 +65,8 @@ final class PillWindowController: NSObject, NSWindowDelegate {
         let hosting = NSHostingController(
             rootView: PillView(
                 model: viewModel,
-                onTap: { [weak self] in self?.onPillTapped?() }
+                onTap: { [weak self] in self?.onPillTapped?() },
+                onCancel: { [weak self] in self?.onPillCancelTapped?() }
             )
         )
         // Fondo transparente del hosting para que solo el círculo sea visible
