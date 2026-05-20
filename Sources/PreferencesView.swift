@@ -114,7 +114,8 @@ struct ModelsTab: View {
                 UpdateRow(
                     packageName: "whisper-cpp",
                     state: updater.whisperState,
-                    onUpdate: { updater.upgradeWhisper() }
+                    onUpdate: { updater.upgradeWhisper() },
+                    onCheck:  { updater.checkForUpdates(force: true) }
                 )
             }
         }
@@ -179,7 +180,8 @@ struct LLMTab: View {
                 UpdateRow(
                     packageName: "llama.cpp",
                     state: updater.llamaState,
-                    onUpdate: { updater.upgradeLlama() }
+                    onUpdate: { updater.upgradeLlama() },
+                    onCheck:  { updater.checkForUpdates(force: true) }
                 )
             }
             .disabled(!enabled)
@@ -685,42 +687,57 @@ struct UpdateRow: View {
     let packageName: String
     let state: UpdateChecker.PackageState
     let onUpdate: () -> Void
+    let onCheck: () -> Void
 
     var body: some View {
-        switch state {
-        case .idle, .upToDate:
-            EmptyView()
+        HStack(spacing: 8) {
+            statusContent
+            Spacer()
+            actionButton
+        }
+    }
 
+    @ViewBuilder
+    private var statusContent: some View {
+        switch state {
+        case .idle:
+            HStack(spacing: 6) {
+                Image(systemName: "circle.dashed")
+                    .foregroundColor(.secondary)
+                Text(packageName)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         case .checking:
             HStack(spacing: 6) {
                 ProgressView().scaleEffect(0.65)
-                Text("Verificando actualizaciones…")
-                    .foregroundColor(.secondary)
+                Text("Verificando \(packageName)…")
                     .font(.caption)
+                    .foregroundColor(.secondary)
             }
-
+        case .upToDate:
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                Text("\(packageName) al día")
+                    .font(.caption)
+                    .foregroundColor(.green)
+            }
         case .available(let version):
-            HStack {
+            HStack(spacing: 6) {
                 Image(systemName: "arrow.up.circle.fill")
                     .foregroundColor(.orange)
                 Text("Actualización disponible: \(version)")
                     .font(.caption)
                     .foregroundColor(.orange)
-                Spacer()
-                Button("Actualizar") { onUpdate() }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.orange)
-                    .controlSize(.small)
             }
-
         case .upgrading:
             HStack(spacing: 6) {
                 ProgressView().scaleEffect(0.65)
-                Text("Actualizando \(packageName)… esto puede tomar un minuto")
-                    .foregroundColor(.secondary)
+                Text("Actualizando \(packageName)…")
                     .font(.caption)
+                    .foregroundColor(.secondary)
             }
-
         case .upgraded:
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.circle.fill")
@@ -729,7 +746,6 @@ struct UpdateRow: View {
                     .font(.caption)
                     .foregroundColor(.green)
             }
-
         case .error(let msg):
             HStack(spacing: 6) {
                 Image(systemName: "exclamationmark.circle.fill")
@@ -738,6 +754,23 @@ struct UpdateRow: View {
                     .font(.caption)
                     .foregroundColor(.red)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var actionButton: some View {
+        switch state {
+        case .available:
+            Button("Actualizar") { onUpdate() }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+                .controlSize(.small)
+        case .checking, .upgrading:
+            EmptyView()
+        default:
+            Button("Verificar") { onCheck() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
         }
     }
 }
